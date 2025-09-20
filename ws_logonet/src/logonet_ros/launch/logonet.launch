@@ -1,0 +1,4 @@
+<launch>
+  <node pkg="logonet_ros" type="logonet_node.py" name="logonet_node" output="screen"/>
+    <!-- <node name="subscribe_print_result" pkg="logonet_ros" type="subscribe_print_result.py" output="screen"/> -->
+</launch>

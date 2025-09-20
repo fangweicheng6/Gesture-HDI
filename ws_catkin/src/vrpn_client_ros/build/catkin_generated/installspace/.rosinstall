@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/robot/vrpn_client_ros/install/setup.sh

@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ROS Launch",
+            "type": "python",
+            "request": "launch",
+            "program": "/opt/ros/noetic/bin/roslaunch",
+            "args": ["logonet_ros", "logonet.launch"],
+            "console": "integratedTerminal",
+            "env": {
+                "ROS_PACKAGE_PATH": "/home/robot/ws_catkin/src:/opt/ros/noetic/share",
+                "PYTHONPATH": "/home/robot/.conda/envs/logo/lib/python3.8/site-packages:/opt/ros/noetic/lib/python3/dist-packages:/home/robot/ws_catkin/devel/lib/python3/dist-packages"
+            }
+        }
+    ]
+}

@@ -1,0 +1,22 @@
+# 预处理kitti数据集
+cd LoGoNet-train/detection
+python -m al3d_det.datasets.kitti.kitti_dataset create_kitti_infos /mnt/fwc/projects/LoGoNet-train/detection/tools/cfgs/det_dataset_cfgs/kitti_dataset_mm.yaml
+
+# 执行训练
+cd LoGoNet-train/detection/tools
+bash scripts/dist_train.sh 0,3 2 --cfg_file cfgs/det_model_cfgs/kitti/LoGoNet-kitti.yaml
+
+CUDA_VISIBLE_DEVICES=0 python train.py --cfg_file cfgs/det_model_cfgs/kitti/LoGoNet-kitti.yaml
+CUDA_VISIBLE_DEVICES=0 python train.py --cfg_file cfgs/det_model_cfgs/kitti/LoGoNet-kitti.yaml --launcher pytorch
+
+CUDA_VISIBLE_DEVICES=0,2 python -m torch.distributed.launch --nproc_per_node=2 --rdzv_endpoint=yz-PowerEdge-T640:18881 train.py --launcher pytorch --cfg_file cfgs/det_model_cfgs/kitti/LoGoNet-kitti.yaml
+
+# 测试
+CUDA_VISIBLE_DEVICES=0 python test.py --cfg_file cfgs/det_model_cfgs/kitti/LoGoNet-kitti.yaml --batch_size 1 --ckpt /mnt/fwc/projects/LoGoNet-train/detection/output/det_model_cfgs/kitti/LoGoNet-kitti/default/ckpt/checkpoint_epoch_80.pth
+
+# 可视化
+python visualize.py --cfg_file cfgs/det_model_cfgs/kitti/LoGoNet-kitti.yaml --ckpt /mnt/fwc/projects/LoGoNet_train/detection/output/det_model_cfgs/kitti/LoGoNet-kitti/default/ckpt/checkpoint_epoch_50.pth
+
+#预测
+cd LoGoNet-train/detection/predict
+python predict.py --cfg_file ../tools/cfgs/det_model_cfgs/kitti/LoGoNet-kitti.yaml --batch_size 1 --ckpt /mnt/fwc/projects/LoGoNet-train/detection/output/det_model_cfgs/kitti/LoGoNet-kitti/default/ckpt/checkpoint_epoch_80.pth

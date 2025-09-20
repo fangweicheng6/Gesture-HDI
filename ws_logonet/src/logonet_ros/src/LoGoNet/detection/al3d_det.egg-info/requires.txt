@@ -1,0 +1,7 @@
+numpy
+torch>=1.1
+spconv-cu114
+numba
+tensorboardX
+easydict
+pyyaml

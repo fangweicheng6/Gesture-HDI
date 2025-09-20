@@ -1,0 +1,357 @@
+CLASS_NAMES: ['Up', 'Down', 'Left', 'Right', 'Hover']
+
+# 轻量化版本配置
+
+DATA_CONFIG:
+    _BASE_CONFIG_: /home/robot/ws_logonet/src/logonet_ros/src/LoGoNet/detection/tools/cfgs/det_dataset_cfgs/kitti_dataset_mm.yaml
+
+
+MODEL:
+    # remember to use "--pretrained_model" to load 1-stage checkpoint 
+    # and use "--fix_pretrained_weights" to fix params
+
+    NAME: ANCHORMMKITTI                 # 模型名称，表示这是一个基于KITTI数据集的多模态检测模型          
+    SECOND_STAGE:                 # 是否使用二阶段
+    
+    VFE:
+        NAME: MeanVFE                   # 使用平均体素特征编码
+    
+    
+    IMAGE_BACKBONE:                     # 图像骨干网络
+        NAME: MMDETFPNKITTI             # 名称
+
+        # IMGPRETRAINED_MODEL: '../output_s2/det_model_cfgs/pretrained_ckpt/swin_tiny_patch4_window7_224.pth'
+        FREEZE_IMGBACKBONE:        # 是否冻结图像骨干
+
+
+        # 图像特征网络配置
+        IFN:                            
+            ARGS: {                     # 特征提取层
+                "feat_extract_layer": ["layer1"],  
+            }
+
+                                        # 通道减少操作
+            CHANNEL_REDUCE: {
+                "in_channels": [256],   # 修改256->128
+                "out_channels": [64],
+                "kernel_size": [1],     # 卷积核大小
+                "stride": [1],          # 步幅
+                "bias": [False]         # 是否使用偏置
+            }
+        
+
+        # 图像主干网络的详细配置
+        IMGCONFIG: {
+            type: 'SwinTransformer',    # 使用SwinTransformer作为图像主干网络
+            # embed_dim: 48,
+            embed_dim: 96,              # 嵌入维度
+            
+            depths: [2, 2, 6, 2],       # 每个阶段的深度
+            # depths: [1, 1, 3, 1],       # 每个阶段的深度
+            
+            
+            num_heads: [3, 6, 12, 24],  # 每个阶段的注意力头数量
+            window_size: 7,             # 窗口大小
+            mlp_ratio: 4,               # MLP比例
+            qkv_bias: True,             # 是否使用QKV偏置
+            qk_scale: None,             # QK缩放比例
+            drop_rate: 0.,              # 丢弃率
+            attn_drop_rate: 0.,         # 注意力丢弃率
+            drop_path_rate: 0.2,        # 路径丢弃率
+            ape: False,                 # 是否使用绝对位置编码
+            patch_norm: True,           # 是否使用补丁归一化
+            out_indices: [0, 1, 2, 3],  # 输出索引
+            use_checkpoint: False,      # 是否使用检查点
+        }
+
+        # FPNCONFIG 定义了FPN结构的配置，用于构建特征金字塔
+        FPNCONFIG: {
+            type: 'FPN',                         # 使用FPN (Feature Pyramid Network)
+            
+            in_channels: [96, 192, 384, 768],    # 输入通道数
+            # in_channels: [48, 96, 192, 384],
+            
+            # 修改 256 -> 128
+            # out_channels: 256,                   # 输出通道数
+            out_channels: 256,
+            
+            num_outs: 5                          # 输出数量
+            # num_outs: 4 
+        }
+    
+    # 3D点云的主干网络
+    BACKBONE_3D:
+        NAME: Backbone3D
+
+    # 3D点云映射到BEV (Bird's Eye View) 的配置
+    MAP_TO_BEV:
+        NAME: HeightCompression           # 使用HeightCompression将3D点云映射到BEV
+        NUM_BEV_FEATURES: 256             # 输出BEV的特征数量
+
+    # 处理BEV图像的2D卷积网络结构
+    BACKBONE_2D:
+        NAME: Backbone2D
+        
+        LAYER_NUMS: [5, 5]                # 每个阶段的层数
+        # LAYER_NUMS: [3, 3]
+        
+        LAYER_STRIDES: [1, 2]             # 每个阶段的步幅
+        
+        NUM_FILTERS: [128, 256]           # 每个阶段的过滤器数量
+        # NUM_FILTERS: [64, 128]
+        
+        UPSAMPLE_STRIDES: [1, 2]          # 每个阶段的上采样步幅 控制特征图的缩放比例
+        
+        
+        NUM_UPSAMPLE_FILTERS: [256, 256]  # 每个阶段的上采样过滤器数量
+        # NUM_UPSAMPLE_FILTERS: [128, 128]
+
+
+    # 密集检测头
+    DENSE_HEAD:
+        NAME: AnchorHeadSingle            #使用 AnchorHeadSingle 模型
+        CLASS_AGNOSTIC: False             # 类别不可知为false，对不同类别使用不同参数回归检测，
+                                          # 类别间差异较小的目标检测（比如车和行人）
+
+        USE_DIRECTION_CLASSIFIER:    # 是否使用方向分类器来预测目标的朝向
+        DIR_OFFSET: 0.78539               # 方向分类的偏移量
+        DIR_LIMIT_OFFSET: 0.0             # 方向限制偏移量
+        NUM_DIR_BINS: 2                   # 方向分类的bin数
+
+        # 定义了锚框生成器的配置
+        ANCHOR_GENERATOR_CONFIG: [
+            {
+                'class_name': 'Up',
+                'anchor_sizes': [[0.72, 1.54, 1.31]],
+                'anchor_rotations': [0],
+                'anchor_bottom_heights': [-1.15],
+                'align_center': False,
+                'feature_map_stride': 8,
+                'matched_threshold': 0.8,
+                'unmatched_threshold': 0.45
+            },
+            {
+                'class_name': 'Down',                  # 为每个类别使用相同的锚框配置
+                'anchor_sizes': [[0.72, 1.54, 1.31]],  # 通用的锚框尺寸
+                'anchor_rotations': [0],         # 通用的旋转角度
+                'anchor_bottom_heights': [-1.15],      # 通用的锚框底部高度
+                'align_center': False,                 # 是否对齐中心
+                'feature_map_stride': 8,               # 特征图步幅
+                'matched_threshold': 0.8,              # 匹配阈值
+                'unmatched_threshold': 0.45            # 不匹配阈值
+            },
+            {
+                'class_name': 'Left',
+                'anchor_sizes': [[0.72, 1.54, 1.31]],
+                'anchor_rotations': [0],
+                'anchor_bottom_heights': [-1.15],
+                'align_center': False,
+                'feature_map_stride': 8,
+                'matched_threshold': 0.8,
+                'unmatched_threshold': 0.45
+            },
+            {
+                'class_name': 'Right',
+                'anchor_sizes': [[0.72, 1.54, 1.31]],
+                'anchor_rotations': [0],
+                'anchor_bottom_heights': [-1.15],
+                'align_center': False,
+                'feature_map_stride': 8,
+                'matched_threshold': 0.8,
+                'unmatched_threshold': 0.45
+            },
+            {
+                'class_name': 'Hover',
+                'anchor_sizes': [[0.72, 1.54, 1.31]],
+                'anchor_rotations': [0],
+                'anchor_bottom_heights': [-1.15],
+                'align_center': False,
+                'feature_map_stride': 8,
+                'matched_threshold': 0.8,
+                'unmatched_threshold': 0.45
+            }
+        ]
+
+        TARGET_ASSIGNER_CONFIG:               # 目标分配器的配置
+            NAME: AxisAlignedTargetAssigner   # 使用AxisAlignedTargetAssigner进行目标分配
+            POS_FRACTION: -1.0                # 正样本比例
+            SAMPLE_SIZE: 512                  # 样本数量
+            NORM_BY_NUM_EXAMPLES: False       # 是否按样本数量进行归一化
+            MATCH_HEIGHT: False               # 是否匹配高度
+            BOX_CODER: ResidualCoder          # 使用ResidualCoder编码器
+
+        
+        LOSS_CONFIG:                          # 定义了损失函数的配置
+            LOSS_WEIGHTS: {
+                'cls_weight': 1.0,
+                'loc_weight': 2.0,
+                'dir_weight': 0.0,
+                'code_weights': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+            }
+    
+
+    ROI_HEAD:                  # 二阶段检测的区域提议网络配置
+        NAME: LoGoHeadKITTI
+        CLASS_AGNOSTIC: True   # 类别不可知为true，对不同类别使用同一组参数回归检测，
+                                # 适用于类别间差异较小的目标检测
+
+        # 修改
+        # SHARED_FC: [256, 256]  # 共享的全连接层大小
+        # CLS_FC: [256, 256]     # 分类全连接层大小
+        # REG_FC: [256, 256]     # 回归全连接层大小
+
+        SHARED_FC: [128, 128]  # 减小全连接层的大小
+        CLS_FC: [128, 128]
+        REG_FC: [128, 128]
+
+
+        DP_RATIO: 0.3          # 丢弃率 0.3
+
+
+        NMS_CONFIG:                         # 非极大值抑制（NMS）配置
+
+            TRAIN:                          # 训练时的NMS配置
+                NMS_TYPE: nms_gpu           # 使用GPU进行NMS
+                MULTI_CLASSES_NMS: False    # 是否对多类别进行NMS
+                NMS_PRE_MAXSIZE: 9000       # NMS前最大保留数
+                NMS_POST_MAXSIZE: 512       # NMS后最大保留数
+                NMS_THRESH: 0.8             # NMS阈值
+
+            TEST:                           # 测试时的NMS配置
+                NMS_TYPE: nms_gpu
+                MULTI_CLASSES_NMS: False
+                NMS_PRE_MAXSIZE: 1024
+                NMS_POST_MAXSIZE: 100
+                NMS_THRESH: 0.7
+
+        VOXEL_AGGREGATION:                           # 体素特征聚合配置
+            NUM_FEATURES: [64, 64]                   # 特征数量
+            FEATURE_LOCATIONS: [x_conv3, x_conv4]    # 特征位置
+        
+        
+        ROI_GRID_POOL:                               # ROI网格池化配置
+            FEATURE_LOCATIONS: [x_conv3, x_conv4]    # 特征位置
+            GRID_SIZE: 6                             # 网格大小
+            
+            POOL_LAYERS:                             # 池化层配置
+                x_conv3:                             # x_conv3层配置
+                    MLPS: [[32, 32], [32, 32]]       # MLP配置
+                    POOL_RADIUS: [0.4, 0.8]          # 池化半径
+                    NSAMPLE: [16, 16]                # 样本数量
+                    POOL_METHOD: max_pool            # 池化方法
+                    USE_DENSITY: True                # 是否使用密度
+
+                x_conv4:                             # x_conv4层配置
+                    MLPS: [[32, 32], [32, 32]]
+                    POOL_RADIUS: [0.8, 1.6]
+                    NSAMPLE: [16, 16]
+                    POOL_METHOD: max_pool
+                    USE_DENSITY: True
+
+            FUSION:                                    # 特征融合配置
+                NAME: VoxelWithPointProjectionV2KITTI  # 使用VoxelWithPointProjectionV2KITTI进行融合
+                FUSE_MODE: 'crossattention_deform'     # 使用跨注意力变形模式进行融合
+                # CAMERAS: ['camera_0', 'camera_1', 'camera_2', 'camera_3', 'camera_4']  # 使用的摄像头列表
+                CAMERAS: ['camera_0']
+                IMAGE_SCALE: 0.5                       # 图像缩放比例
+                INTERPOLATE: True                      # 是否进行插值
+                # DEPTH_THRES: {'camera_0': 0, 'camera_1': 0, 'camera_2': 0, 'camera_3': 0, 'camera_4': 0}  # 深度阈值
+                DEPTH_THRES: {'camera_0': 0}
+                LAYER_CHANNEL: {'layer1': 64}          # 层通道配置
+                MID_CHANNELS: 64                       # 中间通道数量
+                FUSE_OUT: True                         # 是否输出融合结果
+
+            ATTENTION:                                   # 注意力机制配置
+                ENABLED: True                            # 是否启用注意力机制
+                NUM_FEATURES: 128                        # 特征数量
+                NUM_HEADS: 1                             # 注意力头数量
+                NUM_HIDDEN_FEATURES: 128                 # 隐藏特征数量
+                NUM_LAYERS: 1                            # 注意力层数量
+                POSITIONAL_ENCODER: density_grid_points  # 使用密度网格点作为位置编码
+                MAX_NUM_BOXES: 20                        # 最大边界框数量
+                DROPOUT: 0.1                             # 丢弃率
+                COMBINE: True                            # 是否合并结果
+                MASK_EMPTY_POINTS: True                  # 是否掩盖空点
+
+            DENSITYQUERY:                                # 密度查询配置
+                ENABLED: True                            # 是否启用密度查询
+                NUM_FEATURES: 128                        # 特征数量
+                NUM_HIDDEN_FEATURES: 128
+                POSITIONAL_ENCODER: density_grid_points
+                MAX_NUM_BOXES: 20
+                DROPOUT: 0.1
+                COMBINE: True
+                MASK_EMPTY_POINTS: True
+
+
+        TARGET_CONFIG:                          # 目标配置
+            BOX_CODER: ResidualCoder            # 使用ResidualCoder进行边界框编码
+            ROI_PER_IMAGE: 128                  # 每张图像的ROI数量
+            FG_RATIO: 0.5                       # 正样本比例
+
+            SAMPLE_ROI_BY_EACH_CLASS: True      # 是否按类别采样ROI
+            CLS_SCORE_TYPE: roi_iou             # 使用ROI的IOU作为分类得分类型
+
+            CLS_FG_THRESH: 0.75                 # 分类正样本阈值
+            CLS_BG_THRESH: 0.25                 # 分类背景阈值
+            CLS_BG_THRESH_LO: 0.1
+            HARD_BG_RATIO: 0.8                  # 背景样本中困难样本的比例
+
+            REG_FG_THRESH: 0.55                 # 回归正样本阈值
+
+        LOSS_CONFIG:                            # ROI阶段的损失配置
+            CLS_LOSS: BinaryCrossEntropy        # 分类损失使用二元交叉熵
+            REG_LOSS: smooth-l1                 # 回归损失使用Smooth L1损失
+            CORNER_LOSS_REGULARIZATION: True    # 是否使用角点损失正则化
+            LOSS_WEIGHTS: {                     # 各种损失的权重
+                'rcnn_cls_weight': 1.0,         # ROI分类损失权重
+                'rcnn_reg_weight': 1.0,         # ROI回归损失权重
+                'rcnn_corner_weight': 1.0,      # ROI角点损失权重
+                'code_weights': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]   # 回归编码的权重
+            }
+
+    POST_PROCESSING:                            # 后处理配置
+        RECALL_THRESH_LIST: [0.3, 0.5, 0.7]     # 召回率评估的阈值列表
+        
+        # 修改
+        # SCORE_THRESH: 0.3                       # 分数阈值
+        SCORE_THRESH: 0.95
+        
+        OUTPUT_RAW_SCORE: False                 # 是否输出原始得分
+
+        EVAL_METRIC: kitti                      # 评估指标使用KITTI的标准
+
+        NMS_CONFIG:                             # 非极大值抑制配置
+            MULTI_CLASSES_NMS: False            # 是否对多类别进行NMS
+            NMS_TYPE: nms_gpu                   # NMS类型使用GPU进行加速
+
+            # NMS_THRESH: 0.55                    # NMS的阈值
+            # NMS_PRE_MAXSIZE: 4096               # NMS前最大保留的候选框数量
+            # NMS_POST_MAXSIZE: 500               # NMS后最大保留的候选框数量
+
+            NMS_THRESH: 0.5             # 增加NMS阈值，可以减少候选框的数量
+            NMS_PRE_MAXSIZE: 16       # 减少NMS前的最大保留数
+            NMS_POST_MAXSIZE: 1        # 减少NMS后的最大保留数
+
+
+OPTIMIZATION:                     # 优化配置
+    BATCH_SIZE_PER_GPU: 2         # 每块GPU的批处理大小
+    NUM_EPOCHS: 80                # 训练的总轮数
+
+    OPTIMIZER: adam_onecycle      # 使用Adam with OneCycle学习率调度作为优化器
+    # LR: 0.001
+    LR: 0.001                     # 初始学习率
+    WEIGHT_DECAY: 0.01            # 权重衰减系数
+    MOMENTUM: 0.9                 # 动量
+
+    MOMS: [0.95, 0.85]            # OneCycle学习率调度中的最大和最小动量
+    PCT_START: 0.4                # OneCycle调度中学习率增加阶段占总训练时间的比例
+    DIV_FACTOR: 10                # OneCycle调度中初始学习率与最大学习率的倍数
+    DECAY_STEP_LIST: [35, 45]     # 学习率衰减的轮数列表
+    LR_DECAY: 0.1                 # 学习率衰减系数
+    LR_CLIP: 0.0000001            # 学习率的下限
+
+    LR_WARMUP: False              # 是否使用学习率预热
+    WARMUP_EPOCH: 1               # 预热的轮数
+
+    GRAD_NORM_CLIP: 10            # 梯度裁剪的最大范数

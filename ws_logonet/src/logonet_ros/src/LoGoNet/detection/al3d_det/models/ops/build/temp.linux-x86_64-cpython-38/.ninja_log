@@ -1,0 +1,7 @@
+# ninja log v5
+1	6763	1723612527250927660	/home/yxm/projects/LoGoNet-train/detection/al3d_det/models/ops/build/temp.linux-x86_64-cpython-38/home/yxm/projects/LoGoNet-train/detection/al3d_det/models/ops/src/cpu/ms_deform_attn_cpu.o	d5cc34d808f87076
+1	21735	1723612542219838868	/home/yxm/projects/LoGoNet-train/detection/al3d_det/models/ops/build/temp.linux-x86_64-cpython-38/home/yxm/projects/LoGoNet-train/detection/al3d_det/models/ops/src/cuda/ms_deform_attn_cuda.o	2f4a793e9fdccb4a
+1	30131	1723612550612349541	/home/yxm/projects/LoGoNet-train/detection/al3d_det/models/ops/build/temp.linux-x86_64-cpython-38/home/yxm/projects/LoGoNet-train/detection/al3d_det/models/ops/src/vision.o	79388c0ed055f96d
+16	4146	1728193772044689400	/mnt/fwc/projects/LoGoNet-train/detection/al3d_det/models/ops/build/temp.linux-x86_64-cpython-38/mnt/fwc/projects/LoGoNet-train/detection/al3d_det/models/ops/src/cpu/ms_deform_attn_cpu.o	fd62cc5c0e69bab
+16	13336	1728193781223438100	/mnt/fwc/projects/LoGoNet-train/detection/al3d_det/models/ops/build/temp.linux-x86_64-cpython-38/mnt/fwc/projects/LoGoNet-train/detection/al3d_det/models/ops/src/cuda/ms_deform_attn_cuda.o	9fd15666e2f81ecf
+16	18800	1728193786688646300	/mnt/fwc/projects/LoGoNet-train/detection/al3d_det/models/ops/build/temp.linux-x86_64-cpython-38/mnt/fwc/projects/LoGoNet-train/detection/al3d_det/models/ops/src/vision.o	23110c01c41f4460

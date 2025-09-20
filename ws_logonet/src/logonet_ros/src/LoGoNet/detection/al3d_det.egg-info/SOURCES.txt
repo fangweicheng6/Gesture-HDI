@@ -1,0 +1,8 @@
+setup.py
+al3d_det/__init__.py
+al3d_det/version.py
+al3d_det.egg-info/PKG-INFO
+al3d_det.egg-info/SOURCES.txt
+al3d_det.egg-info/dependency_links.txt
+al3d_det.egg-info/requires.txt
+al3d_det.egg-info/top_level.txt

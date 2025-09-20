@@ -1,0 +1,124 @@
+终端1
+	仿真：
+	    sudo chmod 666 /dev/ttyUSB0
+	    roslaunch mavros px4.launch fcu_url:=serial:///dev/ttyUSB0:921600
+
+	真机：
+	    sudo chmod 666 /dev/ttyACM0
+	     roslaunch mavros px4.launch fcu_url:=serial:///dev/ttyACM0:57600
+
+	roslaunch rpg_mpc mpc_controller2.launch
+
+	roslaunch transmitacr transmitacr.launch
+
+终端2
+	// 动捕里启动节点接收动捕数据并转发到指定话题
+	cd ws_catkin/
+	source devel/setup.bash
+	roslaunch vrpn_client_ros sample.launch server:=192.168.8.42
+
+	rosrun topic_tools relay /vrpn_client_node/fwc/pose /mavros/vision_pose/pose
+	
+终端3
+	roslaunch offboard offboard.launch
+
+	// 运行logonet节点
+	source ~/ws_logonet/devel/setup.bash
+	conda activate logo
+	roslaunch logonet_ros logonet.launch
+
+	mydocker
+	cd home/robot/ws_logonet/
+	source devel/setup.bash 
+	conda activate logo
+	roslaunch logonet_ros logonet.launch
+
+
+终端4
+	source ~/ws_catkin/devel/setup.bash
+	roslaunch livox_ros_driver livox_lidar_rviz.launch
+	rostopic hz /livox/lidar
+
+
+	source ~/ws_catkin/devel/setup.bash
+	roslaunch zed_wrapper zed2.launch
+	rostopic hz /zed2/zed_node/left/image_rect_color
+
+
+终端5
+	// 改频率 执行32即可
+	rosrun mavros mavcmd long 511 31 1000 0 0 0 0 0
+	rosrun mavros mavcmd long 511 32 1000 0 0 0 0 0
+	rostopic hz /mavros/local_position/pose
+
+	// 三选一记录bag
+	rosbag record -a
+	
+	# 不带EKF的
+	rosbag record /livox/lidar /zed2/zed_node/left/image_rect_color /mavros/state /nominal_position /nominal_euler_angles /mavros/local_position/pose /logonet_detection /mpc/point_of_interest /mpc/trajectory_predicted /perception /visualization_marker
+	
+	rosbag record -e '/mavros.*' -e '/mpc.*' -e '/nominal.*' /livox/lidar /zed2/zed_node/left/image_rect_color /logonet_detection  /perception /visualization_marker
+	
+	# 带有EKF的
+	rosbag record -e '/mavros.*' /livox/lidar /zed2/zed_node/left/image_rect_color /mavros/state /nominal_position /nominal_euler_angles /mavros/local_position/pose /mpc/point_of_interest /mpc/trajectory_predicted /perception /logonet_detection_box /logonet_detection_class /ekf_predict /ekf_update /visualization_marker
+	
+	rosbag record -e '/mavros.*' -e '/mpc.*' -e '/nominal.*' -e '/logonet.*' -e '/ekf.*' /livox/lidar /zed2/zed_node/left/image_rect_color /perception /visualization_marker
+    -e表示允许使用正则表达式匹配话题 如果使用多个正则表达式 每个前面都加上-e
+    
+	// 重新编译
+	rm -rf build/ devel/
+	catkin build offboard rpg_mpc transmitacr
+
+
+
+
+// 查看nx和飞控是否连接
+rostopic echo /mavros/state
+
+rostopic hz /mavros/local_position/pose
+
+rostopic echo /mavros/local_position/pose
+
+rostopic echo /nominal_position
+
+rostopic echo /logonet_detection
+
+// 数据流图
+rosrun  rqt_graph rqt_graph 
+
+
+ roslaunch foxglove_bridge foxglove_bridge.launch
+
+cd ydlidar_ros_ws/
+source devel/setup.bash 
+roslaunch ydlidar_ros_driver SDM18.launch 
+
+
+//  其他指令
+catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3
+
+
+
+采集数据步骤
+1.roscore
+
+2.雷达节点
+roslaunch livox_ros_driver livox_lidar_rviz.launch
+
+3.相机节点
+roslaunch zed_wrapper zed2.launch
+
+4.记录话题
+rosbag record /livox/lidar /zed2/zed_node/left/image_rect_color
+
+提取数据步骤
+1.从bag包提取图像数据
+conda activate bag-image
+python3 /home/robot/fwc_bag/code_get_image_pc/bag_to_image.py 1.bag ./image  /zed2/zed_node/left/image_rect_color
+
+2.提取点云数据
+roscore
+rosrun pcl_ros bag_to_pcd lidar_1.bag /livox/lidar ./pc
+
+
+ros master启动时会绑定一个指定机器的ip和端口，如果是localhost就表示本地机器。由于docker启动时使用了--network host这个指令，表示docker与本地主机共享网络栈，这意味着容器直接使用本机的ip和端口，那它们的localhost就是指的同一个地址（127.0.0.1）。ROS节点之间通过ROS Master发现彼此并建立通信，所以docker的终端和本地终端之间可以话题交互。
